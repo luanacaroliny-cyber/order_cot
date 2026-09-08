@@ -153,11 +153,19 @@ export default function Home() {
   const [page, setPage] = useState(1);
 
   useEffect(() => {
+    let active = true;
+
     const loadData = async () => {
       const base = import.meta.env.BASE_URL;
-      const requests = Array.from({ length: 25 }, (_, index) => {
+      const refreshKey = Date.now();
+      const manifestResponse = await fetch(`${base}data-parts/manifest.json?v=${refreshKey}`, {
+        cache: "no-store",
+      });
+      if (!manifestResponse.ok) throw new Error(`Falha ao carregar índice (${manifestResponse.status})`);
+      const manifest = (await manifestResponse.json()) as { parts: number };
+      const requests = Array.from({ length: manifest.parts }, (_, index) => {
         const part = String(index).padStart(3, "0");
-        return fetch(`${base}data-parts/part-${part}`).then((response) => {
+        return fetch(`${base}data-parts/part-${part}?v=${refreshKey}`, { cache: "no-store" }).then((response) => {
           if (!response.ok) throw new Error(`Falha ao carregar dados (${response.status})`);
           return response.arrayBuffer();
         });
@@ -166,10 +174,18 @@ export default function Home() {
       const compressed = new Blob(parts).stream();
       const decompressed = compressed.pipeThrough(new DecompressionStream("gzip"));
       const data = (await new Response(decompressed).json()) as Payload;
-      setPayload(data);
+      if (active) setPayload(data);
     };
 
     loadData().catch((error) => console.error("Não foi possível carregar o dashboard.", error));
+    const refreshTimer = window.setInterval(() => {
+      loadData().catch((error) => console.error("Não foi possível atualizar o dashboard.", error));
+    }, 5 * 60 * 1000);
+
+    return () => {
+      active = false;
+      window.clearInterval(refreshTimer);
+    };
   }, []);
 
   const sourceRows = useMemo(
