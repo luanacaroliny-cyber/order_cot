@@ -29,8 +29,6 @@ jobs:
           node-version: 22
       - name: Instalar dependências
         run: npm install
-      - name: Atualizar dados do Google Sheets
-        run: node scripts/update-data.mjs
       - name: Gerar site
         run: npm run build
       - name: Configurar GitHub Pages
